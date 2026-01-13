@@ -269,6 +269,23 @@ class ModelPatcher:
         if not hasattr(self.model, 'model_offload_buffer_memory'):
             self.model.model_offload_buffer_memory = 0
 
+        if self.model.device == load_device:
+            try:
+                first_param = next(self.model.parameters(), None)
+                if first_param is not None and first_param.device == load_device:
+                    for module in self.model.modules():
+                        if hasattr(module, "weight") and module.weight is not None:
+                            if module.weight.device == load_device:
+                                module.comfy_patched_weights = True
+
+                    self.model.model_lowvram = False
+                    if self.model.model_loaded_weight_memory == 0:
+                        self.model.model_loaded_weight_memory = self.model_size()
+
+                    logging.debug(f"ModelPatcher detected model already on {load_device}, marked as loaded ({self.model.model_loaded_weight_memory / (1024**3):.2f} GB)")
+            except Exception as e:
+                logging.debug(f"ModelPatcher auto-detection failed: {e}")
+
     def model_size(self):
         if self.size > 0:
             return self.size
